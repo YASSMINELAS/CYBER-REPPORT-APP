@@ -24,12 +24,21 @@ const severityRange = {
   low: 'Rule level 0 to 6',
 };
 
+// Couleurs officielles des severities SOC
+const severityColors = {
+  critical: '#ff3b3b', // rouge
+  high: '#ff9800',     // orange
+  medium: '#ffc107',   // jaune
+  low: '#00c853',      // vert
+};
+
 // Convertit un objet { critical, high, ... } en tableau Recharts.
 export const severityStatsToChartData = (stats = {}) =>
   severityOrder.map((severity) => ({
     name: severityLabel[severity],
     value: stats[severity] || 0,
     range: severityRange[severity],
+    color: severityColors[severity],
   }));
 
 // Calcule les compteurs a partir d'une liste de records.
@@ -50,4 +59,10 @@ export const recordsToSeverityChartData = (records = []) => {
   return severityStatsToChartData(counts);
 };
 
-export { severityLabel, severityOrder, severityRange };
+export {
+  severityLabel,
+  severityOrder,
+  severityRange,
+  severityColors,
+};
+

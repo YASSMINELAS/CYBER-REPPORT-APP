@@ -1,34 +1,110 @@
-/**
- * Layout principal des pages authentifiees.
- *
- * Role architectural:
- * - Encadre les pages privees avec Sidebar et Topbar.
- * - Utilise Outlet pour afficher la route enfant active.
- */
-// useState gere l'etat visuel de la sidebar.
-import { useState } from 'react';
-// Outlet affiche la page correspondant a la route enfant.
+import { useEffect, useState } from 'react';
+
 import { Outlet } from 'react-router-dom';
-// Navigation laterale.
+
 import Sidebar from './Sidebar';
-// Barre superieure.
 import Topbar from './Topbar';
 
-// Composant layout prive.
+const DESKTOP_BREAKPOINT = 1180;
+
 const AppLayout = () => {
-  // Etat React: true si la sidebar est repliee.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(
+    () => window.innerWidth >= DESKTOP_BREAKPOINT
+  );
+  const [menuOpen, setMenuOpen] = useState(
+    () => window.innerWidth >= DESKTOP_BREAKPOINT
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] =
+    useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(
+      `(min-width: ${DESKTOP_BREAKPOINT}px)`
+    );
+
+    const syncLayout = (event) => {
+      const desktop = event.matches;
+
+      setIsDesktop(desktop);
+      setMenuOpen(desktop);
+    };
+
+    syncLayout(mediaQuery);
+
+    mediaQuery.addEventListener('change', syncLayout);
+
+    return () =>
+      mediaQuery.removeEventListener(
+        'change',
+        syncLayout
+      );
+  }, []);
+
+  useEffect(() => {
+    if (isDesktop) {
+      return undefined;
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+
+    return () =>
+      window.removeEventListener(
+        'keydown',
+        handleEscape
+      );
+  }, [isDesktop]);
+
+  const handleMenuClick = () => {
+    if (isDesktop) {
+      setSidebarCollapsed((current) => !current);
+      return;
+    }
+
+    setMenuOpen((current) => !current);
+  };
+
+  const handleSidebarToggle = () => {
+    if (isDesktop) {
+      setSidebarCollapsed((current) => !current);
+      return;
+    }
+
+    setMenuOpen(false);
+  };
 
   return (
-    <>
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} />
-      <Topbar collapsed={sidebarCollapsed} />
-      <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="main-content">
-          <Outlet />
-        </div>
+    <div
+      className={`app-shell${isDesktop ? ' is-desktop' : ' is-mobile'}${
+        menuOpen ? ' nav-open' : ''
+      }${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+    >
+      <Sidebar
+        open={menuOpen}
+        collapsed={sidebarCollapsed}
+        isDesktop={isDesktop}
+        onToggle={handleSidebarToggle}
+      />
+
+      <div className="app-shell__main">
+        <Topbar
+          onMenuClick={handleMenuClick}
+          isDesktop={isDesktop}
+          isSidebarCollapsed={sidebarCollapsed}
+        />
+
+        <main className="app-shell__content">
+          <div className="app-content">
+            <Outlet />
+          </div>
+        </main>
       </div>
-    </>
+    </div>
   );
 };
 

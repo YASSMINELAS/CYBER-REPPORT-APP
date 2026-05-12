@@ -20,7 +20,7 @@ services:
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: cyber-reports
       KEYCLOAK_CLIENT_ID: cyber-reports-client
-      KEYCLOAK_CLIENT_SECRET: TON_SECRET
+      KEYCLOAK_CLIENT_SECRET: 
     depends_on:
       - keycloak
     networks:

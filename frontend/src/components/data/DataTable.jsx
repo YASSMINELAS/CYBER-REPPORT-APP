@@ -1,17 +1,12 @@
-/**
- * Composant DataTable generique.
- *
- * Role architectural:
- * - Factorise l'affichage des listes incidents/vulnerabilites.
- * - Recoit les colonnes, lignes, filtres, tri et pagination sous forme de props.
- *
- * Flux:
- * Page -> props columns/rows/handlers -> DataTable -> callbacks vers la page.
- */
-// Pagination de table reutilisable.
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  SlidersHorizontal,
+} from 'lucide-react';
+
 import TablePagination from './TablePagination';
 
-// Composant generique: aucune connaissance metier directe.
 const DataTable = ({
   columns,
   rows,
@@ -25,84 +20,150 @@ const DataTable = ({
   onSort,
   onPageChange,
 }) => {
-  // Gere le clic sur un header triable.
   const handleSort = (column) => {
-    // Condition importante: les colonnes non triables ne declenchent rien.
     if (!column.sortable || !onSort) return;
-    const nextOrder = sortBy === column.key && sortOrder === 'desc' ? 'asc' : 'desc';
+
+    const nextOrder =
+      sortBy === column.key && sortOrder === 'desc'
+        ? 'asc'
+        : 'desc';
+
     onSort(column.key, nextOrder);
   };
 
+  const renderSortIcon = (column) => {
+    if (!column.sortable) {
+      return null;
+    }
+
+    if (sortBy !== column.key) {
+      return <ArrowUpDown size={15} />;
+    }
+
+    return sortOrder === 'desc' ? (
+      <ArrowDown size={15} />
+    ) : (
+      <ArrowUp size={15} />
+    );
+  };
+
   return (
-    <section className="data-panel">
+    <section className="table-section">
       {filters.length > 0 && (
-        // Les filtres sont generes dynamiquement depuis la configuration de la page.
-        <div className="data-filters">
-          {filters.map((filter) => (
-            <label key={filter.key}>
-              <span>{filter.label}</span>
-              {filter.type === 'select' ? (
-                <select value={filterValues[filter.key] || 'all'} onChange={(event) => onFilterChange(filter.key, event.target.value)}>
-                  {filter.options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type={filter.type || 'search'}
-                  value={filterValues[filter.key] || ''}
-                  placeholder={filter.placeholder}
-                  onChange={(event) => onFilterChange(filter.key, event.target.value)}
-                />
-              )}
-            </label>
-          ))}
+        <div className="table-toolbar panel">
+          <div className="table-toolbar__header">
+            <div>
+              <span className="table-toolbar__eyebrow">
+                Filter intelligence
+              </span>
+              <p className="table-toolbar__copy">
+                Refine the live dataset by severity, asset, status, or time context.
+              </p>
+            </div>
+
+            {meta && (
+              <div className="table-toolbar__meta">
+                <SlidersHorizontal size={16} />
+                {meta.total || rows.length} records
+              </div>
+            )}
+          </div>
+
+          <div className="filters-bar">
+            {filters.map((filter) => (
+              <label className="filter-group" key={filter.key}>
+                <span className="filter-label">
+                  {filter.label || filter.key}
+                </span>
+
+                {filter.type === 'select' ? (
+                  <select
+                    value={filterValues[filter.key] || 'all'}
+                    onChange={(event) =>
+                      onFilterChange(filter.key, event.target.value)
+                    }
+                  >
+                    {filter.options.map((option) => (
+                      <option
+                        key={option.value}
+                        value={option.value}
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={filter.type || 'search'}
+                    placeholder={filter.placeholder}
+                    value={filterValues[filter.key] || ''}
+                    onChange={(event) =>
+                      onFilterChange(filter.key, event.target.value)
+                    }
+                  />
+                )}
+              </label>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="table-wrap fade-in">
+      <div className="table-wrap">
         <table className="data-table">
           <thead>
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`${column.sortable ? 'sortable' : ''}${column.headerClassName ? ` ${column.headerClassName}` : ''}`}
                   onClick={() => handleSort(column)}
-                  scope="col"
+                  className={`${column.sortable ? 'sortable' : ''}${
+                    column.headerClassName
+                      ? ` ${column.headerClassName}`
+                      : ''
+                  }`}
                 >
-                  <div className="header-content">
+                  <div className="th-content">
                     <span>{column.label}</span>
-                    {column.sortable && (
-                      <span className="sort-indicator">
-                        {sortBy === column.key ? (sortOrder === 'desc' ? 'v' : '^') : '-'}
-                      </span>
-                    )}
+                    <span className="sort-icon">
+                      {renderSortIcon(column)}
+                    </span>
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
+
           <tbody>
-            {rows.map((row, index) => (
-              // Cle defensive: Mongo _id, id, externalId, puis fallback stable.
-              <tr key={row._id || row.id || row.externalId || `${row.title}-${index}`}>
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className={typeof column.cellClassName === 'function' ? column.cellClassName(row) : (column.cellClassName || '')}
-                  >
-                    {column.render ? column.render(row) : row[column.key] || '-'}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              // Etat vide pedagogique: informe l'utilisateur qu'aucune donnee ne correspond.
+            {rows.length > 0 ? (
+              rows.map((row, index) => (
+                <tr
+                  key={
+                    row._id ||
+                    row.id ||
+                    row.externalId ||
+                    index
+                  }
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={
+                        column.cellClassName || ''
+                      }
+                    >
+                      {column.render
+                        ? column.render(row)
+                        : row[column.key] ?? '-'}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
               <tr>
-                <td className="empty-cell" colSpan={columns.length}>
+                <td
+                  colSpan={columns.length}
+                  className="empty-state"
+                >
                   {emptyMessage}
                 </td>
               </tr>
@@ -112,7 +173,6 @@ const DataTable = ({
       </div>
 
       {meta && onPageChange && (
-        // Pagination affichee seulement si la page fournit meta + callback.
         <TablePagination
           page={meta.page}
           pages={meta.pages}

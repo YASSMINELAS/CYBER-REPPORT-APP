@@ -1,11 +1,5 @@
-/**
- * Graphique camembert des severites.
- *
- * Role architectural:
- * - Visualise la distribution critical/high/medium/low.
- * - Recoit des donnees deja preparees par utils/charts.js.
- */
-// Composants Recharts necessaires au pie chart.
+// SeverityPieChart.jsx
+
 import {
   Cell,
   Legend,
@@ -15,19 +9,26 @@ import {
   Tooltip,
 } from 'recharts';
 
-// Couleurs coherentes avec les badges de severite.
 const SEVERITY_COLORS = {
-  Critical: '#dc2626',
-  High: '#f97316',
-  Medium: '#2563eb',
-  Low: '#16a34a',
+  critical: '#b30909',
+  high: '#f9f946',
+  medium: '#ff6607',
+  low: '#0a8e41',
 };
 
-// Props: title pour le panneau, data pour Recharts.
 const SeverityPieChart = ({ title, data }) => {
   return (
     <article className="panel chart-card">
-      <h2>{title}</h2>
+      <div className="chart-card__header">
+        <div>
+          <span className="chart-kicker">
+            Severity Lens
+          </span>
+
+          <h2>{title}</h2>
+        </div>
+      </div>
+
       <div className="chart-area">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -42,11 +43,38 @@ const SeverityPieChart = ({ title, data }) => {
               paddingAngle={3}
             >
               {data.map((entry) => (
-                <Cell key={entry.name} fill={SEVERITY_COLORS[entry.name]} />
+                <Cell
+                  key={entry.name}
+                  fill={
+                    SEVERITY_COLORS[
+                      entry.name.toLowerCase()
+                    ]
+                  }
+                />
               ))}
             </Pie>
-            <Tooltip formatter={(value, name, item) => [value, `${name} - ${item.payload.range}`]} />
-            <Legend />
+
+            <Tooltip
+              formatter={(value, name, item) => [
+                value,
+                `${name} - ${item.payload.range}`,
+              ]}
+              contentStyle={{
+                background: 'rgba(8, 17, 32, 0.92)',
+                border:
+                  '1px solid rgba(56, 189, 248, 0.18)',
+                borderRadius: '16px',
+                color: '#dbeafe',
+              }}
+            />
+
+            <Legend
+              verticalAlign="bottom"
+              wrapperStyle={{
+                paddingTop: 18,
+                color: '#9fb2cc',
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -55,4 +83,5 @@ const SeverityPieChart = ({ title, data }) => {
 };
 
 export { SEVERITY_COLORS };
+
 export default SeverityPieChart;

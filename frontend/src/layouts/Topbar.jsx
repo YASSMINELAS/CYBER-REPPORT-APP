@@ -1,66 +1,265 @@
-/**
- * Topbar applicative.
- *
- * Role architectural:
- * - Affiche la recherche globale, l'utilisateur courant et le logout.
- * - La recherche redirige vers Threat Hunting avec un query param.
- */
-// useState gere le champ de recherche.
-import { useState } from 'react';
-// useNavigate permet la redirection.
-import { useNavigate } from 'react-router-dom';
-// toast informe l'utilisateur au logout.
-import { toast } from 'react-toastify';
-// Helpers auth: lecture utilisateur et suppression token.
-import { clearAuth, getCurrentUser } from '../services/api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-// collapsed adapte le style a l'etat de la sidebar.
-const Topbar = ({ collapsed }) => {
-  // Navigation programmee.
+import {
+  Bell,
+  ChevronDown,
+  LogOut,
+  Menu,
+  Search,
+  ShieldCheck,
+} from 'lucide-react';
+
+import {
+  defaultPageDescriptor,
+  findNavigationItem,
+} from '../config/navigation';
+import { getCurrentUser } from '../services/api';
+import keycloak from '../keycloak';
+
+const pageOverrides = {
+  '/add-vulnerability': {
+    label: 'New Vulnerability',
+    description:
+      'Create a manually tracked finding with remediation context.',
+  },
+  '/add-incident': {
+    label: 'New Incident',
+    description:
+      'Capture response details, indicators, and analyst notes.',
+  },
+};
+
+const Topbar = ({
+  onMenuClick,
+  isDesktop,
+  isSidebarCollapsed,
+}) => {
   const navigate = useNavigate();
-  // Utilisateur decode depuis le JWT.
-  const user = getCurrentUser();
-  // Etat controle du champ de recherche.
-  const [search, setSearch] = useState('');
+  const location = useLocation();
 
-  // Soumet la recherche globale vers la page Threat Hunting.
-  const handleSearch = (event) => {
-    event.preventDefault();
+  const user = getCurrentUser();
+
+  const [search, setSearch] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const menuRef = useRef(null);
+
+  const pageDetails = useMemo(() => {
+    if (
+      location.pathname.startsWith(
+        '/vulnerabilities/'
+      ) &&
+      location.pathname.endsWith('/edit')
+    ) {
+      return {
+        label: 'Edit Vulnerability',
+        description:
+          'Update exposure details, tactic mapping, and remediation guidance.',
+      };
+    }
+
+    if (
+      location.pathname.startsWith('/incidents/') &&
+      location.pathname.endsWith('/edit')
+    ) {
+      return {
+        label: 'Edit Incident',
+        description:
+          'Update triage context, status, and remediation actions.',
+      };
+    }
+
+    if (pageOverrides[location.pathname]) {
+      return pageOverrides[location.pathname];
+    }
+
+    return (
+      findNavigationItem(location.pathname) ||
+      defaultPageDescriptor
+    );
+  }, [location.pathname]);
+
+  const userInitials = useMemo(() => {
+    const username =
+      user?.username?.trim() || 'admin';
+
+    return username
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((value) => value[0]?.toUpperCase())
+      .join('');
+  }, [user?.username]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target)
+      ) {
+        setMenuOpen(false);
+      }
+    };
+
+    window.addEventListener(
+      'pointerdown',
+      handlePointerDown
+    );
+
+    return () =>
+      window.removeEventListener(
+        'pointerdown',
+        handlePointerDown
+      );
+  }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+
     const query = search.trim();
-    // Condition importante: ne pas naviguer avec une recherche vide.
-    if (query) navigate(`/threat-hunting?search=${encodeURIComponent(query)}`);
+
+    if (query) {
+      navigate(`/threat-hunting?search=${encodeURIComponent(query)}`);
+    }
   };
 
-  // Deconnecte l'utilisateur cote frontend.
-  const handleLogout = () => {
-    clearAuth();
-    toast.info('Logged out successfully.');
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    await keycloak.logout({
+      redirectUri: window.location.origin,
+    });
   };
 
   return (
-    <header className={`topbar ${collapsed ? 'collapsed' : ''}`}>
-      <form className="global-search" role="search" onSubmit={handleSearch}>
-        <span aria-hidden="true">Search</span>
+    <header className="topbar">
+      <div className="topbar-left">
+        <button
+          type="button"
+          className="icon-button topbar-menu-button"
+          onClick={onMenuClick}
+          aria-label={
+            isDesktop
+              ? isSidebarCollapsed
+                ? 'Expand navigation'
+                : 'Collapse navigation'
+              : 'Open navigation'
+          }
+        >
+          <Menu size={18} />
+        </button>
+
+        <div className="topbar-context">
+          <div className="topbar-context__title-row">
+            <div>
+              <span className="topbar-context__eyebrow">
+                SOC Platform
+              </span>
+              <h2>{pageDetails.label}</h2>
+            </div>
+
+            <span className="topbar-status-pill">
+              <ShieldCheck size={14} />
+              Keycloak Secured
+            </span>
+          </div>
+
+          <p>{pageDetails.description}</p>
+        </div>
+      </div>
+
+      <form
+        className="topbar-search"
+        onSubmit={handleSearch}
+      >
+        <Search size={18} />
+
         <input
           type="search"
-          placeholder="Search alerts, hosts, CVEs..."
+          placeholder="Search telemetry, host, CVE, plugin, or IOC"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(e) =>
+            setSearch(e.target.value)
+          }
         />
+
+        <button
+          type="submit"
+          className="search-submit-button"
+        >
+          Hunt
+        </button>
       </form>
 
-      <div className="topbar-actions">
-        <div className="user-menu">
-          <span className="user-avatar">{user?.username?.charAt(0).toUpperCase() || 'U'}</span>
-          <span className="user-info">
-            <span className="user-name">{user?.username || 'User'}</span>
-            <span className="user-role">{user?.role || 'viewer'}</span>
-          </span>
-        </div>
-        <button type="button" className="icon-button" onClick={handleLogout} title="Logout" aria-label="Logout">
-          X
+      <div className="topbar-user">
+        <button
+          type="button"
+          className="icon-button notification-button"
+          aria-label="Notifications"
+        >
+          <Bell size={18} />
+          <span className="notification-dot" />
         </button>
+
+        <div
+          className={`user-menu${menuOpen ? ' open' : ''}`}
+          ref={menuRef}
+        >
+          <button
+            type="button"
+            className="user-menu__trigger"
+            onClick={() =>
+              setMenuOpen((current) => !current)
+            }
+            aria-expanded={menuOpen}
+          >
+            <span className="user-avatar">
+              {userInitials || 'A'}
+            </span>
+
+            <span className="user-meta">
+              <strong>
+                {user?.username || 'admin'}
+              </strong>
+              <small>
+                {user?.role || 'viewer'}
+              </small>
+            </span>
+
+            <ChevronDown size={16} />
+          </button>
+
+          {menuOpen && (
+            <div className="user-menu__panel">
+              <div className="user-menu__summary">
+                <span className="user-avatar large">
+                  {userInitials || 'A'}
+                </span>
+
+                <div>
+                  <strong>
+                    {user?.username || 'admin'}
+                  </strong>
+                  <span>
+                    {user?.role || 'viewer'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="user-menu__action"
+                onClick={handleLogout}
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

@@ -1,0 +1,285 @@
+/* =====================================================
+   LAYOUT — app shell, content area, page headers
+   sidebar.css gère uniquement la sidebar.
+   Ce fichier gère tout le reste du layout.
+   ===================================================== */
+
+/* ─── Variables globales ──────────────────────────────── */
+:root {
+  --sidebar-width: 290px;
+  --sidebar-collapsed-width: 110px;
+  --topbar-height: 72px;
+  --content-max-width: 1440px;
+}
+
+/* ─── App Shell ───────────────────────────────────────── */
+.app-shell {
+  min-height: 100vh;
+}
+
+/* ─── Main (zone droite) ──────────────────────────────── */
+.app-shell__main {
+  min-height: 100vh;
+  transition:
+    margin-left 0.28s ease,
+    width 0.28s ease;
+}
+
+/* Desktop : décaler le main selon la largeur de la sidebar */
+.app-shell.is-desktop .app-shell__main {
+  margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
+}
+
+.app-shell.is-desktop.sidebar-collapsed .app-shell__main {
+  margin-left: var(--sidebar-collapsed-width);
+  width: calc(100% - var(--sidebar-collapsed-width));
+}
+
+/* Mobile : pleine largeur */
+.app-shell.is-mobile .app-shell__main {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* ─── Zone de contenu scrollable ─────────────────────── */
+.app-shell__content {
+  padding:
+    calc(var(--topbar-height) + 28px)
+    32px
+    48px;
+}
+
+/* ─── Conteneur interne avec max-width ───────────────── */
+.app-content {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+/* ─── Page ────────────────────────────────────────────── */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.wide-page,
+.dashboard-page,
+.form-page {
+  width: 100%;
+}
+
+/* ─── Page Header ─────────────────────────────────────── */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 32px 36px;
+  border-radius: 20px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-gradient);
+}
+
+.page-header__main {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.page-header__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Limite la largeur du bloc texte pour éviter les lignes trop longues */
+  max-width: 640px;
+}
+
+/* Eyebrow / kicker */
+.page-header__eyebrow,
+.section-kicker,
+.table-toolbar__eyebrow,
+.chart-kicker,
+.topbar-context__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+}
+
+/* Titre principal — taille contrôlée */
+.page-header h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 3.5vw, 3.2rem);   /* ← réduit par rapport à 4.9rem */
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.97rem;
+  line-height: 1.7;
+  max-width: 560px;
+}
+
+.page-header__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 100%;
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Meta pills ──────────────────────────────────────── */
+.page-meta-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.page-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  background: rgba(8, 17, 32, 0.5);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ─── Split layout ────────────────────────────────────── */
+.split-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* ─── Details panel ───────────────────────────────────── */
+.details-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.panel-heading h2 {
+  margin: 6px 0 0;
+}
+
+.panel-heading p {
+  margin: 8px 0 0;
+}
+
+/* ─── Messages ────────────────────────────────────────── */
+.message {
+  color: var(--text-secondary);
+}
+
+.error-message {
+  color: #f8d4db;
+  border-color: rgba(251, 113, 133, 0.2);
+  background: linear-gradient(
+    145deg,
+    rgba(63, 15, 23, 0.74),
+    rgba(8, 17, 32, 0.82)
+  );
+}
+
+.error-text {
+  color: #f8d4db;
+}
+
+/* ─── Responsive ──────────────────────────────────────── */
+
+/* Tablet */
+@media (max-width: 1180px) {
+  :root {
+    --topbar-height: 72px;
+  }
+
+  .app-shell__content {
+    padding:
+      calc(var(--topbar-height) + 20px)
+      20px
+      32px;
+  }
+
+  .split-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header h1 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+  }
+}
+
+/* Phablet */
+@media (max-width: 960px) {
+  .app-shell__content {
+    padding:
+      calc(var(--topbar-height) + 16px)
+      16px
+      24px;
+  }
+
+  .page-header {
+    padding: 24px 20px;
+    flex-direction: column;
+  }
+
+  .page-header__main,
+  .page-header__actions,
+  .page-header__meta {
+    width: 100%;
+  }
+
+  .page-header__meta {
+    justify-content: flex-start;
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  :root {
+    --topbar-height: 64px;
+  }
+
+  .page-header {
+    padding: 18px 16px;
+  }
+
+  .page-header h1 {
+    font-size: clamp(1.5rem, 6vw, 2rem);
+  }
+
+  .page-header p {
+    font-size: 0.92rem;
+  }
+}

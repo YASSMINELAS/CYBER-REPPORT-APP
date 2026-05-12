@@ -16,7 +16,6 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Incidents from './pages/Incidents.jsx';
 import IncidentFormPage from './pages/IncidentFormPage.jsx';
-import Login from './pages/Login.jsx';
 import ScanDetails from './pages/ScanDetails.jsx';
 import ThreatHunting from './pages/ThreatHunting.jsx';
 import Vulnerabilities from './pages/Vulnerabilities.jsx';
@@ -32,8 +31,6 @@ const App = () => {
       <Routes>
         {/* Redirection de la racine vers le dashboard. */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        {/* Page publique: aucun token requis. */}
-        <Route path="/login" element={<Login />} />
         {/* Toutes les routes imbriquees passent par ProtectedRoute. */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
@@ -57,7 +54,7 @@ const App = () => {
         newestOnTop
         closeOnClick
         pauseOnHover
-        theme="light"
+        theme="dark"
         toastClassName="app-toast"
       />
     </>

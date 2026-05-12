@@ -1,24 +1,16 @@
-/**
- * Page formulaire Incident.
- *
- * Role architectural:
- * - Sert a creer ou modifier un incident manuel.
- * - Prepare les champs dans le format attendu par l'API backend.
- */
-// Hooks React pour lifecycle, memoisation et etat.
 import { useEffect, useMemo, useState } from 'react';
-// Routing: lien retour, navigation apres sauvegarde, id depuis l'URL.
 import { Link, useNavigate, useParams } from 'react-router-dom';
-// Notifications utilisateur.
 import { toast } from 'react-toastify';
-// Loader de chargement.
-import Loader from '../components/Loader';
-// Service API incidents.
-import { createIncident, getIncident, updateIncident } from '../services/incidentService';
-// Helper pour messages d'erreur backend.
-import { getApiErrorMessage } from '../services/api';
 
-// Valeurs initiales en mode creation.
+import Loader from '../components/Loader';
+import PageHeader from '../components/PageHeader';
+import { getApiErrorMessage } from '../services/api';
+import {
+  createIncident,
+  getIncident,
+  updateIncident,
+} from '../services/incidentService';
+
 const defaultForm = {
   title: '',
   description: '',
@@ -31,39 +23,31 @@ const defaultForm = {
   solution: '',
 };
 
-// Transforme un tableau MongoDB en chaine editable.
-const arrayToInput = (value) => (Array.isArray(value) ? value.join(', ') : value || '');
+const arrayToInput = (value) =>
+  Array.isArray(value) ? value.join(', ') : value || '';
 
-// Transforme une chaine separee par virgules en tableau.
 const inputToArray = (value) =>
   String(value || '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
 
-// Composant React du formulaire incident.
 const IncidentFormPage = () => {
-  // id est present en edition.
   const { id } = useParams();
-  // Navigation apres succes.
   const navigate = useNavigate();
-  // Booleen derive pour choisir create/update.
   const isEditing = Boolean(id);
-  // Etat controle de tous les champs du formulaire.
+
   const [formData, setFormData] = useState(defaultForm);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Charge l'incident existant si on edite.
   useEffect(() => {
-    // En creation, on garde defaultForm.
     if (!isEditing) return;
 
     const loadIncident = async () => {
       try {
         setLoading(true);
-        // Appel API: GET /api/incidents/:id.
         const incident = await getIncident(id);
         setFormData({
           title: incident.title || '',
@@ -73,11 +57,16 @@ const IncidentFormPage = () => {
           host: incident.host || incident.agentIP || '',
           port: incident.port || '',
           cve: arrayToInput(incident.cve),
-          mitreTactic: arrayToInput(incident.mitreTactic),
+          mitreTactic: arrayToInput(
+            incident.mitreTactic
+          ),
           solution: incident.solution || '',
         });
-      } catch (error) {
-        const message = getApiErrorMessage(error, 'Failed to load incident.');
+      } catch (requestError) {
+        const message = getApiErrorMessage(
+          requestError,
+          'Failed to load incident.'
+        );
         setError(message);
         toast.error(message);
       } finally {
@@ -88,28 +77,33 @@ const IncidentFormPage = () => {
     loadIncident();
   }, [id, isEditing]);
 
-  // Payload envoye a l'API: convertit port et tableaux.
-  const payload = useMemo(() => ({
-    ...formData,
-    port: formData.port === '' ? undefined : Number(formData.port),
-    cve: inputToArray(formData.cve),
-    mitreTactic: inputToArray(formData.mitreTactic),
-  }), [formData]);
+  const payload = useMemo(
+    () => ({
+      ...formData,
+      port:
+        formData.port === ''
+          ? undefined
+          : Number(formData.port),
+      cve: inputToArray(formData.cve),
+      mitreTactic: inputToArray(formData.mitreTactic),
+    }),
+    [formData]
+  );
 
-  // Met a jour un champ controle.
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value }));
+    setFormData((current) => ({
+      ...current,
+      [name]: value,
+    }));
   };
 
-  // Soumet create ou update.
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError('');
 
     try {
-      // En edition on appelle PUT, sinon POST.
       if (isEditing) {
         await updateIncident(id, payload);
         toast.success('Incident updated.');
@@ -118,8 +112,11 @@ const IncidentFormPage = () => {
         toast.success('Incident created.');
       }
       navigate('/incidents');
-    } catch (error) {
-      const message = getApiErrorMessage(error, 'Failed to save incident.');
+    } catch (requestError) {
+      const message = getApiErrorMessage(
+        requestError,
+        'Failed to save incident.'
+      );
       setError(message);
       toast.error(message);
     } finally {
@@ -129,81 +126,199 @@ const IncidentFormPage = () => {
 
   return (
     <main className="page form-page">
-      <section className="page-header">
-        <div>
-          <h1>{isEditing ? 'Edit Incident' : 'Add Incident'}</h1>
-          <p>Capture triage context, affected asset details, indicators, and remediation guidance.</p>
-        </div>
-        <Link className="secondary-button" to="/incidents">Back to incidents</Link>
-      </section>
+      <PageHeader
+        eyebrow="Incident Intake"
+        title={
+          isEditing ? 'Edit Incident' : 'Add Incident'
+        }
+        description="Capture triage context, impacted assets, MITRE mapping, and remediation guidance while keeping the existing API behavior intact."
+        actions={
+          <Link
+            className="secondary-button"
+            to="/incidents"
+          >
+            Back to incidents
+          </Link>
+        }
+      />
 
-      {loading && <Loader label="Loading incident..." />}
+      {loading && (
+        <Loader label="Loading incident..." />
+      )}
 
       {!loading && (
-        <form className="panel record-form" onSubmit={handleSubmit}>
-          <div className="form-grid">
-            <label className="span-2">
-              Title
-              <input name="title" value={formData.title} onChange={handleChange} required placeholder="Suspicious PowerShell execution" />
-            </label>
+        <section className="form-layout">
+          <aside className="panel form-sidebar">
+            <span className="section-kicker">
+              Analyst guidance
+            </span>
+            <h2>Make the incident easy to triage.</h2>
+            <p>
+              Capture what happened, which asset
+              is affected, the current response
+              state, and the action plan for
+              containment or remediation.
+            </p>
+            <div className="form-hint-list">
+              <div className="form-hint">
+                <strong>Status</strong>
+                <span>
+                  Keep response state aligned
+                  with analyst workflow.
+                </span>
+              </div>
+              <div className="form-hint">
+                <strong>Description</strong>
+                <span>
+                  Preserve investigation notes
+                  and detection context.
+                </span>
+              </div>
+              <div className="form-hint">
+                <strong>Solution</strong>
+                <span>
+                  Capture containment or
+                  remediation next steps.
+                </span>
+              </div>
+            </div>
+          </aside>
 
-            <label>
-              Severity
-              <select name="severity" value={formData.severity} onChange={handleChange}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </label>
+          <form
+            className="panel record-form"
+            onSubmit={handleSubmit}
+          >
+            <div className="form-grid">
+              <label className="span-2">
+                Title
+                <input
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  required
+                  placeholder="Suspicious PowerShell execution"
+                />
+              </label>
 
-            <label>
-              Status
-              <select name="status" value={formData.status} onChange={handleChange}>
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-                <option value="resolved">Resolved</option>
-              </select>
-            </label>
+              <label>
+                Severity
+                <select
+                  name="severity"
+                  value={formData.severity}
+                  onChange={handleChange}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">
+                    Critical
+                  </option>
+                </select>
+              </label>
 
-            <label>
-              Host / IP
-              <input name="host" value={formData.host} onChange={handleChange} placeholder="10.0.4.21" />
-            </label>
+              <label>
+                Status
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                >
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
+                  <option value="resolved">
+                    Resolved
+                  </option>
+                </select>
+              </label>
 
-            <label>
-              Port
-              <input type="number" min="0" max="65535" name="port" value={formData.port} onChange={handleChange} placeholder="443" />
-            </label>
+              <label>
+                Host / IP
+                <input
+                  name="host"
+                  value={formData.host}
+                  onChange={handleChange}
+                  placeholder="10.0.4.21"
+                />
+              </label>
 
-            <label>
-              CVE
-              <input name="cve" value={formData.cve} onChange={handleChange} placeholder="CVE-2024-0001, CVE-2024-0002" />
-            </label>
+              <label>
+                Port
+                <input
+                  type="number"
+                  min="0"
+                  max="65535"
+                  name="port"
+                  value={formData.port}
+                  onChange={handleChange}
+                  placeholder="443"
+                />
+              </label>
 
-            <label>
-              MITRE Tactic
-              <input name="mitreTactic" value={formData.mitreTactic} onChange={handleChange} placeholder="Execution, Persistence" />
-            </label>
+              <label>
+                CVE
+                <input
+                  name="cve"
+                  value={formData.cve}
+                  onChange={handleChange}
+                  placeholder="CVE-2024-0001, CVE-2024-0002"
+                />
+              </label>
 
-            <label className="span-2">
-              Description
-              <textarea name="description" value={formData.description} onChange={handleChange} rows="5" placeholder="What happened, where it was detected, and analyst notes." />
-            </label>
+              <label>
+                MITRE Tactic
+                <input
+                  name="mitreTactic"
+                  value={formData.mitreTactic}
+                  onChange={handleChange}
+                  placeholder="Execution, Persistence"
+                />
+              </label>
 
-            <label className="span-2">
-              Solution
-              <textarea name="solution" value={formData.solution} onChange={handleChange} rows="4" placeholder="Containment and remediation steps." />
-            </label>
-          </div>
+              <label className="span-2">
+                Description
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows="6"
+                  placeholder="What happened, where it was detected, and analyst notes."
+                />
+              </label>
 
-          {error && <p className="error-text">{error}</p>}
+              <label className="span-2">
+                Solution
+                <textarea
+                  name="solution"
+                  value={formData.solution}
+                  onChange={handleChange}
+                  rows="5"
+                  placeholder="Containment and remediation steps."
+                />
+              </label>
+            </div>
 
-          <div className="form-actions">
-            <Link className="secondary-button" to="/incidents">Cancel</Link>
-            <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Incident'}</button>
-          </div>
-        </form>
+            {error && (
+              <p className="error-text">{error}</p>
+            )}
+
+            <div className="form-actions">
+              <Link
+                className="secondary-button"
+                to="/incidents"
+              >
+                Cancel
+              </Link>
+              <button
+                type="submit"
+                disabled={saving}
+              >
+                {saving
+                  ? 'Saving...'
+                  : 'Save Incident'}
+              </button>
+            </div>
+          </form>
+        </section>
       )}
     </main>
   );

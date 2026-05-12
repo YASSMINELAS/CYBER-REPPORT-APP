@@ -1,24 +1,34 @@
-/**
- * Page Incidents.
- *
- * Role architectural:
- * - Liste les incidents avec filtres, tri et pagination.
- * - Permet la preview Wazuh puis l'import des alertes selectionnees.
- * - Applique les permissions UI selon le role utilisateur.
- */
-// Hooks React pour etat, effets et callbacks stables.
-import { useCallback, useEffect, useState } from 'react';
-// Link cree des liens; useNavigate redirige vers les formulaires edit.
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-// Notifications utilisateur.
 import { toast } from 'react-toastify';
-// Composants UI de table, chargement et badge.
+
+import {
+  Cell,
+  PieChart,
+  Pie,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+
+import {
+  Radar,
+  ShieldAlert,
+  Siren,
+  Target,
+} from 'lucide-react';
+
 import DataTable from '../components/data/DataTable';
 import Loader from '../components/Loader';
+import PageHeader from '../components/PageHeader';
 import SeverityBadge from '../components/SeverityBadge';
-// Helpers auth/erreur.
+import StatCard from '../components/StatCard';
 import { getApiErrorMessage, hasRole } from '../services/api';
-// Service API incidents: encapsule les appels Axios.
 import {
   closeIncident,
   deleteIncident,
@@ -26,17 +36,32 @@ import {
   importIncidents,
   previewWazuhAlerts,
 } from '../services/incidentService';
+import { severityColors } from '../utils/charts';
 
-// Taille de page envoyee au backend.
 const limit = 20;
 
-// Petits render helpers pour garder les colonnes lisibles.
-const statusBadge = (status) => <span className={`badge status-${status || 'open'}`}>{status || 'open'}</span>;
-const arrayText = (value) => (Array.isArray(value) && value.length ? value.join(', ') : '-');
-const formatDate = (value) => (value ? new Date(value).toLocaleString() : '-');
+const tooltipStyle = {
+  contentStyle: {
+    background: 'rgba(8,17,32,0.95)',
+    border: '1px solid rgba(56,189,248,0.18)',
+    borderRadius: '12px',
+    color: '#dbeafe',
+    fontSize: '12px',
+  },
+};
+
+const statusBadge = (status) => (
+  <span className={`badge status-${status || 'open'}`}>{status || 'open'}</span>
+);
+
+const arrayText = (value) =>
+  Array.isArray(value) && value.length ? value.join(', ') : '-';
+
+const formatDate = (value) =>
+  value ? new Date(value).toLocaleString() : '-';
 
 const filters = [
-  { key: 'search', label: 'Search', placeholder: 'Title, host, CVE, MITRE...', type: 'search' },
+  { key: 'search', label: 'Search', placeholder: 'Title, host, CVE, MITRE…', type: 'search' },
   {
     key: 'severity',
     label: 'Severity',
@@ -65,22 +90,17 @@ const filters = [
   { key: 'to', label: 'To', type: 'datetime-local' },
 ];
 
-// Composant React principal de la page incidents.
 const Incidents = () => {
-  // Navigation programmee vers les pages d'edition.
   const navigate = useNavigate();
-  // Permissions UI: le backend reste la vraie protection, l'UI cache juste les actions.
   const canManageRecords = hasRole('admin', 'analyst');
   const canDeleteRecords = hasRole('admin');
-  // Donnees principales de la table.
+
   const [rows, setRows] = useState([]);
-  // Donnees de preview Wazuh avant sauvegarde.
   const [previewRows, setPreviewRows] = useState([]);
-  // Set des externalId selectionnes dans la preview.
   const [selectedPreviewIds, setSelectedPreviewIds] = useState(new Set());
-  // Etat des filtres controle par DataTable.
-  const [filterValues, setFilterValues] = useState({ severity: 'all', status: 'all', search: '', agent: '', from: '', to: '' });
-  // Etat du tri envoye au backend.
+  const [filterValues, setFilterValues] = useState({
+    severity: 'all', status: 'all', search: '', agent: '', from: '', to: '',
+  });
   const [sortBy, setSortBy] = useState('timestamp');
   const [sortOrder, setSortOrder] = useState('desc');
   const [page, setPage] = useState(1);
@@ -91,20 +111,18 @@ const Incidents = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Charge une page d'incidents depuis l'API.
   const fetchRows = useCallback(async (nextPage = 1) => {
     try {
       setLoading(true);
       setError('');
-      // Appel API: GET /api/incidents avec filtres/pagination/tri.
       const payload = await getIncidents({ ...filterValues, page: nextPage, limit, sortBy, sortOrder });
       setRows(payload.data || []);
       setTotal(payload.total || 0);
       setPages(payload.pages || 1);
       setPage(payload.page || nextPage);
-    } catch (error) {
-      if (error.response?.status === 401) return;
-      const message = getApiErrorMessage(error, 'Failed to load incidents.');
+    } catch (requestError) {
+      if (requestError.response?.status === 401) return;
+      const message = getApiErrorMessage(requestError, 'Failed to load incidents.');
       setError(message);
       toast.error(message);
     } finally {
@@ -112,13 +130,9 @@ const Incidents = () => {
     }
   }, [filterValues, sortBy, sortOrder]);
 
-  // Recharge automatiquement lorsque filtres ou tri changent.
-  useEffect(() => {
-    fetchRows(1);
-  }, [filterValues, sortBy, sortOrder, fetchRows]);
+  useEffect(() => { fetchRows(1); }, [filterValues, sortBy, sortOrder, fetchRows]);
 
   const handleFilterChange = (key, value) => {
-    // Manipulation d'etat React: mise a jour immuable d'un filtre.
     setFilterValues((current) => ({ ...current, [key]: value }));
     setPage(1);
   };
@@ -130,25 +144,21 @@ const Incidents = () => {
   };
 
   const handlePreview = async () => {
-    // Condition importante: l'UI bloque les roles non autorises avant l'appel backend.
     if (!canManageRecords) return toast.error('Only admins and analysts can import Wazuh alerts.');
-
     try {
       setPreviewLoading(true);
-      // Appel API: GET /api/external/wazuh/preview.
       const preview = await previewWazuhAlerts();
       setPreviewRows(preview);
       setSelectedPreviewIds(new Set());
       toast.success(`${preview.length} Wazuh alerts ready for review.`);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Failed to connect to Wazuh.'));
+    } catch (requestError) {
+      toast.error(getApiErrorMessage(requestError, 'Failed to connect to Wazuh.'));
     } finally {
       setPreviewLoading(false);
     }
   };
 
   const togglePreviewRow = (externalId) => {
-    // Set est clone pour respecter l'immutabilite de l'etat React.
     setSelectedPreviewIds((current) => {
       const next = new Set(current);
       next.has(externalId) ? next.delete(externalId) : next.add(externalId);
@@ -157,19 +167,16 @@ const Incidents = () => {
   };
 
   const saveSelected = async () => {
-    // Donnees sortantes: seuls les elements selectionnes sont envoyes au backend.
     const items = previewRows.filter((row) => selectedPreviewIds.has(row.externalId));
     if (!items.length) return toast.info('Select at least one Wazuh alert first.');
-
     try {
       setSubmitting(true);
-      // Appel API: POST /api/incidents/import.
       const payload = await importIncidents(items);
       toast.success(`${payload.imported} incidents saved.`);
       setSelectedPreviewIds(new Set());
       await fetchRows(1);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Failed to save selected incidents.'));
+    } catch (requestError) {
+      toast.error(getApiErrorMessage(requestError, 'Failed to save selected incidents.'));
     } finally {
       setSubmitting(false);
     }
@@ -177,57 +184,97 @@ const Incidents = () => {
 
   const handleClose = async (row) => {
     try {
-      // Appel API: PATCH /api/incidents/:id/status.
       await closeIncident(row._id);
       toast.success('Incident closed.');
       await fetchRows(page);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Failed to update incident status.'));
+    } catch (requestError) {
+      toast.error(getApiErrorMessage(requestError, 'Failed to update incident status.'));
     }
   };
 
   const handleDelete = async (row) => {
-    // Confirmation navigateur avant action destructive.
     if (!window.confirm(`Delete incident "${row.title}"?`)) return;
-
     try {
       await deleteIncident(row._id);
       toast.success('Incident deleted.');
       await fetchRows(page);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Failed to delete incident.'));
+    } catch (requestError) {
+      toast.error(getApiErrorMessage(requestError, 'Failed to delete incident.'));
     }
   };
 
+  // ─── Chart data ──────────────────────────────────────────────────────────
+
+  const severityChartData = useMemo(() => {
+    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+    rows.forEach((r) => {
+      const s = r.severity?.toLowerCase();
+      if (s in counts) counts[s]++;
+    });
+    return Object.entries(counts).map(([key, value]) => ({
+      name: key.charAt(0).toUpperCase() + key.slice(1),
+      value,
+      color: severityColors[key],
+    }));
+  }, [rows]);
+
+  const statusChartData = useMemo(() => {
+    const counts = { open: 0, closed: 0, resolved: 0 };
+    rows.forEach((r) => {
+      const s = r.status || 'open';
+      if (s in counts) counts[s]++;
+    });
+    return [
+      { name: 'Open', value: counts.open, color: '#38bdf8' },
+      { name: 'Closed', value: counts.closed, color: '#6f86a8' },
+      { name: 'Resolved', value: counts.resolved, color: '#22c55e' },
+    ];
+  }, [rows]);
+
+  // ─── Stats ────────────────────────────────────────────────────────────────
+
+  const openCount = rows.filter((row) => (row.status || 'open') === 'open').length;
+  const criticalCount = rows.filter((row) => row.severity?.toLowerCase() === 'critical').length;
+  const agentCount = new Set(rows.map((row) => row.agentName || row.agentIP).filter(Boolean)).size;
+
+  // ─── Columns ──────────────────────────────────────────────────────────────
+
   const columns = [
-    // Configuration declarative des colonnes de DataTable.
     { key: 'title', label: 'Incident', sortable: true },
-    { key: 'severity', label: 'Severity', sortable: true, render: (row) => <SeverityBadge value={row.severity} /> },
-    { key: 'status', label: 'Status', sortable: true, render: (row) => statusBadge(row.status) },
-    { key: 'host', label: 'Host / IP', sortable: true, render: (row) => row.host || row.agentIP || '-' },
-    { key: 'port', label: 'Port', sortable: true, render: (row) => row.port || '-' },
+    {
+      key: 'severity', label: 'Severity', sortable: true,
+      render: (row) => <SeverityBadge value={row.severity} />,
+    },
+    {
+      key: 'status', label: 'Status', sortable: true,
+      render: (row) => statusBadge(row.status),
+    },
+    {
+      key: 'host', label: 'Host / IP', sortable: true,
+      render: (row) => row.host || row.agentIP || '-',
+    },
+    {
+      key: 'port', label: 'Port', sortable: true,
+      render: (row) => row.port || '-',
+    },
     { key: 'cve', label: 'CVE', render: (row) => arrayText(row.cve) },
     { key: 'mitreTactic', label: 'MITRE', render: (row) => arrayText(row.mitreTactic) },
-    { key: 'timestamp', label: 'Time', sortable: true, render: (row) => formatDate(row.timestamp || row.createdAt) },
     {
-      key: 'actions',
-      label: 'Actions',
+      key: 'timestamp', label: 'Time', sortable: true,
+      render: (row) => formatDate(row.timestamp || row.createdAt),
+    },
+    {
+      key: 'actions', label: 'Actions',
       render: (row) => (
         <div className="row-actions">
           {canManageRecords && (
             <>
-              <button type="button" className="secondary-button" onClick={() => navigate(`/incidents/${row._id}/edit`)}>
-                Edit
-              </button>
-              <button type="button" className="secondary-button" onClick={() => handleClose(row)}>
-                Close
-              </button>
+              <button type="button" className="secondary-button" onClick={() => navigate(`/incidents/${row._id}/edit`)}>Edit</button>
+              <button type="button" className="secondary-button" onClick={() => handleClose(row)}>Close</button>
             </>
           )}
           {canDeleteRecords && (
-            <button type="button" className="danger-button" onClick={() => handleDelete(row)}>
-              Delete
-            </button>
+            <button type="button" className="danger-button" onClick={() => handleDelete(row)}>Delete</button>
           )}
         </div>
       ),
@@ -236,10 +283,13 @@ const Incidents = () => {
 
   const previewColumns = [
     {
-      key: 'select',
-      label: '',
+      key: 'select', label: '',
       render: (row) => (
-        <input type="checkbox" checked={selectedPreviewIds.has(row.externalId)} onChange={() => togglePreviewRow(row.externalId)} />
+        <input
+          type="checkbox"
+          checked={selectedPreviewIds.has(row.externalId)}
+          onChange={() => togglePreviewRow(row.externalId)}
+        />
       ),
     },
     { key: 'title', label: 'Rule' },
@@ -249,41 +299,130 @@ const Incidents = () => {
     { key: 'mitreTactic', label: 'MITRE', render: (row) => arrayText(row.mitreTactic) },
   ];
 
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <main className="page wide-page">
-      <section className="page-header">
-        <div>
-          <h1>Incidents</h1>
-          <p>Investigate Wazuh alerts, track response status, and maintain remediation context.</p>
-        </div>
-        {canManageRecords && (
-          <div className="header-actions">
-            <button type="button" className="secondary-button" onClick={handlePreview} disabled={previewLoading}>
-              {previewLoading ? 'Connecting...' : 'Connect to Wazuh'}
-            </button>
-            <Link className="add-button" to="/add-incident">+ Add Incident</Link>
+      <PageHeader
+        eyebrow="Detection Response"
+        title="Incidents"
+        description="Investigate Wazuh alerts, preserve analyst context, and manage response status."
+        meta={
+          <div className="page-meta-badges">
+            <span className="page-meta-pill">{total} tracked incidents</span>
+            <span className="page-meta-pill">{previewRows.length} preview rows</span>
           </div>
-        )}
+        }
+        actions={
+          canManageRecords && (
+            <>
+              <button type="button" className="secondary-button" onClick={handlePreview} disabled={previewLoading}>
+                {previewLoading ? 'Connecting…' : 'Connect to Wazuh'}
+              </button>
+              <Link className="add-button" to="/add-incident">Add Incident</Link>
+            </>
+          )
+        }
+      />
+
+      {/* Stat cards */}
+      <section className="stats-grid stats-grid--compact">
+        <StatCard label="Visible incidents" value={rows.length} helper="Current page results" icon={Siren} accent="cyan" />
+        <StatCard label="Open investigations" value={openCount} helper="Still in response flow" icon={ShieldAlert} accent="blue" />
+        <StatCard label="Critical alerts" value={criticalCount} helper="Immediate analyst focus" icon={Target} accent="teal" />
+        <StatCard label="Impacted agents" value={agentCount} helper="Unique assets in view" icon={Radar} accent="cyan" />
       </section>
 
-      {previewLoading && <Loader label="Fetching Wazuh preview..." />}
+      {/* Charts */}
+      {!loading && rows.length > 0 && (
+        <section className="charts-row">
+          {/* Severity donut */}
+          <article className="panel chart-card">
+            <div>
+              <span className="chart-kicker">Alert severity</span>
+              <p className="chart-title">Incidents by Severity</p>
+            </div>
+            <div className="chart-wrap">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={severityChartData} cx="50%" cy="50%" innerRadius={38} outerRadius={68} dataKey="value" labelLine={false}>
+                    {severityChartData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip {...tooltipStyle} />
+                  <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 11, color: '#9fb2cc' }}>{v}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+
+          {/* Status donut */}
+          <article className="panel chart-card">
+            <div>
+              <span className="chart-kicker">Response status</span>
+              <p className="chart-title">Incidents by Status</p>
+            </div>
+            <div className="chart-wrap">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statusChartData} cx="50%" cy="50%" innerRadius={38} outerRadius={68} dataKey="value" labelLine={false}>
+                    {statusChartData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip {...tooltipStyle} />
+                  <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 11, color: '#9fb2cc' }}>{v}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+
+          {/* Severity bar */}
+          <article className="panel chart-card" style={{ gridColumn: 'span 2' }}>
+            <div>
+              <span className="chart-kicker">Volume</span>
+              <p className="chart-title">Incident Count by Severity</p>
+            </div>
+            <div className="chart-wrap">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={severityChartData} barSize={28}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.1)" />
+                  <XAxis dataKey="name" tick={{ fill: '#9fb2cc', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fill: '#9fb2cc', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip {...tooltipStyle} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {severityChartData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+        </section>
+      )}
+
+      {previewLoading && <Loader label="Fetching Wazuh preview…" />}
+
       {previewRows.length > 0 && (
         <section className="panel preview-panel">
           <div className="panel-heading">
             <div>
+              <span className="section-kicker">External preview</span>
               <h2>Wazuh Preview</h2>
               <p>{selectedPreviewIds.size} of {previewRows.length} selected</p>
             </div>
-            <button type="button" onClick={saveSelected} disabled={submitting || selectedPreviewIds.size === 0}>
-              {submitting ? 'Saving...' : 'Save Selected'}
+            <button
+              type="button"
+              className="add-button"
+              onClick={saveSelected}
+              disabled={submitting || selectedPreviewIds.size === 0}
+            >
+              {submitting ? 'Saving…' : 'Save Selected'}
             </button>
           </div>
           <DataTable columns={previewColumns} rows={previewRows} emptyMessage="No Wazuh alerts found." />
         </section>
       )}
 
-      {loading && <Loader label="Loading incidents..." />}
+      {loading && <Loader label="Loading incidents…" />}
       {error && <div className="panel error-message">{error}</div>}
+
       {!loading && !error && (
         <DataTable
           columns={columns}

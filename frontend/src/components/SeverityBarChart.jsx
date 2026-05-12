@@ -1,41 +1,96 @@
-/**
- * Graphique barres des severites.
- *
- * Role architectural:
- * - Compare les volumes par severite.
- * - Reutilise les couleurs du pie chart pour garder une lecture uniforme.
- */
-// Composants Recharts pour bar chart.
+// SeverityBarChart.jsx
+
 import {
-  Bar,
   BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
+  Bar,
   XAxis,
   YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  CartesianGrid,
+  Legend,
 } from 'recharts';
-// Palette partagee avec SeverityPieChart.
+
 import { SEVERITY_COLORS } from './SeverityPieChart';
 
-// Props: title du graphique et data preparee.
 const SeverityBarChart = ({ title, data }) => {
   return (
     <article className="panel chart-card">
-      <h2>{title}</h2>
+      <div className="chart-card__header">
+        <div>
+          <span className="chart-kicker">
+            Volume View
+          </span>
+
+          <h2>{title}</h2>
+        </div>
+      </div>
+
       <div className="chart-area">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="name" />
-            <YAxis allowDecimals={false} />
-            <Tooltip formatter={(value, name, item) => [value, item.payload.range]} />
-            <Legend />
-            <Bar dataKey="value" name="Count" radius={[6, 6, 0, 0]}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="rgba(148, 163, 184, 0.18)"
+            />
+
+            <XAxis
+              dataKey="name"
+              tick={{
+                fill: '#9fb2cc',
+                fontSize: 12,
+              }}
+              axisLine={false}
+              tickLine={false}
+            />
+
+            <YAxis
+              allowDecimals={false}
+              tick={{
+                fill: '#9fb2cc',
+                fontSize: 12,
+              }}
+              axisLine={false}
+              tickLine={false}
+            />
+
+            <Tooltip
+              formatter={(value, name, item) => [
+                value,
+                item.payload.range,
+              ]}
+              contentStyle={{
+                background: 'rgba(8, 17, 32, 0.92)',
+                border:
+                  '1px solid rgba(56, 189, 248, 0.18)',
+                borderRadius: '16px',
+                color: '#dbeafe',
+              }}
+            />
+
+            <Legend
+              verticalAlign="bottom"
+              wrapperStyle={{
+                paddingTop: 18,
+                color: '#9fb2cc',
+              }}
+            />
+
+            <Bar
+              dataKey="value"
+              radius={[10, 10, 0, 0]}
+            >
               {data.map((entry) => (
-                <Cell key={entry.name} fill={SEVERITY_COLORS[entry.name]} />
+                <Cell
+                  key={entry.name}
+                  fill={
+                    SEVERITY_COLORS[
+                      entry.name.toLowerCase()
+                    ]
+                  }
+                />
               ))}
             </Bar>
           </BarChart>
